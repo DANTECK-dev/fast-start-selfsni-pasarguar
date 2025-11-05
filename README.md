@@ -8,12 +8,12 @@
 
 ```bash
 # Запуск единого скрипта установки
-sudo bash <(curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/main/pasarguard-node-conf/selfsni-xray-pasarguard.sh)
+sudo bash <(curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh?token=GHSAT0AAAAAADOMO2FGTU36N3QDQDB7GACI2ILSIXA)
 ```
 
 Или скачать и запустить:
 ```bash
-curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/main/pasarguard-node-conf/selfsni-xray-pasarguard.sh -o /tmp/setup.sh
+curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh?token=GHSAT0AAAAAADOMO2FGTU36N3QDQDB7GACI2ILSIXA -o /tmp/setup.sh
 sudo bash /tmp/setup.sh
 ```
 
