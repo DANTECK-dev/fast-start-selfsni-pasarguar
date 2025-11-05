@@ -4,26 +4,47 @@
 
 ### Вариант 1: Прямой запуск с GitHub (рекомендуется)
 
-**⚠️ ВАЖНО**: Замените `DANTECK-dev/fast-start-selfsni-pasarguar` на ваш GitHub репозиторий!
+**⚠️ ВАЖНО**: 
+- Замените `DANTECK-dev/fast-start-selfsni-pasarguar` на ваш GitHub репозиторий
+- Убедитесь, что репозиторий **публичный** (не приватный)
 
+**Метод 1: Прямой запуск (если поддерживается process substitution)**
 ```bash
-# Запуск единого скрипта установки
-sudo bash <(curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh?token=GHSAT0AAAAAADOMO2FGTU36N3QDQDB7GACI2ILSIXA)
+sudo bash <(curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh)
 ```
 
-Или скачать и запустить:
+**Метод 2: Через pipe (рекомендуется, работает везде)**
 ```bash
-curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh?token=GHSAT0AAAAAADOMO2FGTU36N3QDQDB7GACI2ILSIXA -o /tmp/setup.sh
+curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh | sudo bash
+```
+
+**Метод 3: Скачать и запустить (самый надежный)**
+```bash
+curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh -o /tmp/setup.sh
 sudo bash /tmp/setup.sh
 ```
 
-### Вариант 2: Клонировать репозиторий
+**Альтернативные варианты URL (если основной не работает):**
+```bash
+# С веткой main (без refs/heads/)
+curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/main/selfsni-xray-pasarguard.sh | sudo bash
+
+# С веткой master
+curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/master/selfsni-xray-pasarguard.sh | sudo bash
+```
+
+**⚠️ Если получаете ошибку 404**, проверьте:
+1. **Публичный ли репозиторий** (Settings → Change visibility → Make public)
+2. Правильная ли ветка (`main` или `master`)
+3. Загружен ли файл на GitHub и закоммичен ли
+
+### Вариант 2: Клонировать репозиторий (рекомендуется, если прямые ссылки не работают)
 
 ```bash
 # На сервере
 cd /tmp
 git clone https://github.com/DANTECK-dev/fast-start-selfsni-pasarguar.git
-cd REPO/pasarguard-node-conf
+cd fast-start-selfsni-pasarguar
 sudo bash selfsni-xray-pasarguard.sh
 ```
 
@@ -31,14 +52,16 @@ sudo bash selfsni-xray-pasarguard.sh
 
 ```bash
 # С локальной машины
-scp pasarguard-node-conf/selfsni-xray-pasarguard.sh root@YOUR_SERVER:/tmp/
-scp pasarguard-node-conf/fakesite.sh root@YOUR_SERVER:/tmp/
-scp pasarguard-node-conf/pg-node.sh root@YOUR_SERVER:/tmp/
+scp selfsni-xray-pasarguard.sh root@YOUR_SERVER:/tmp/
+scp fakesite.sh root@YOUR_SERVER:/tmp/
+scp pg-node.sh root@YOUR_SERVER:/tmp/
 
 # На сервере
 cd /tmp
 sudo bash selfsni-xray-pasarguard.sh
 ```
+
+**Примечание**: Скрипт автоматически скачает `fakesite.sh` и `pg-node.sh` с GitHub, если они не найдены локально.
 
 ## 📋 Что нужно подготовить
 
