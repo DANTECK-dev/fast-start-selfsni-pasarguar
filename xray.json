@@ -1,0 +1,101 @@
+{
+  "log": {
+    "loglevel": "info",
+    "access": "/var/log/xray/access.log",
+    "error": "/var/log/xray/error.log"
+  },
+  "inbounds": [
+    {
+      "tag": "SEs-1-VLESS",
+      "protocol": "vless",
+      "listen": "0.0.0.0",
+      "port": 443,
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "allocate": {
+        "concurrency": 3,
+        "refresh": 5,
+        "strategy": "always"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic",
+          "fakedns"
+        ],
+        "routeOnly": true
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "tcpSettings": {
+          "acceptProxyProtocol": false,
+          "header": {
+            "type": "none"
+          }
+        },
+        "realitySettings": {
+          "fingerprint": "chrome",
+          "dest": "127.0.0.1:443",
+          "serverNames": [
+            "ses-1.onesuper.ru"
+          ],
+          "xver": 0,
+          "publicKey": "SujBaDE17qkHVE1AlLUZsdln7zTZ_aHRn4LpBIcdKCg",
+          "privateKey": "xtHHb8_78YaJzEQZZGB6hXkE88JE0J1_KHcZ-VCHInY",
+          "shortIds": [
+            "2a99da6157d90ae8"
+          ]
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    },
+    {
+      "protocol": "blackhole",
+      "tag": "block"
+    }
+  ],
+  "routing": {
+    "rules": [
+      {
+        "ip": [
+          "geoip:private"
+        ],
+        "outboundTag": "block",
+        "type": "field"
+      },
+      {
+        "outboundTag": "block",
+        "protocol": [
+          "bittorrent"
+        ],
+        "type": "field"
+      },
+      {
+        "type": "field",
+        "ip": [
+          "geoip:cn"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "policy": {
+    "levels": {
+      "0": {
+        "handshake": 2,
+        "connIdle": 120
+      }
+    }
+  }
+}
+
