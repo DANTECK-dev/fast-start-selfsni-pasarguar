@@ -10,27 +10,27 @@
 
 **Метод 1: Прямой запуск (если поддерживается process substitution)**
 ```bash
-sudo bash <(curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh)
 ```
 
 **Метод 2: Через pipe (рекомендуется, работает везде)**
 ```bash
-curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh | sudo bash
+curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh |  bash
 ```
 
 **Метод 3: Скачать и запустить (самый надежный)**
 ```bash
 curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/refs/heads/main/selfsni-xray-pasarguard.sh -o /tmp/setup.sh
-sudo bash /tmp/setup.sh
+bash /tmp/setup.sh
 ```
 
 **Альтернативные варианты URL (если основной не работает):**
 ```bash
 # С веткой main (без refs/heads/)
-curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/main/selfsni-xray-pasarguard.sh | sudo bash
+curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/main/selfsni-xray-pasarguard.sh | bash
 
 # С веткой master
-curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/master/selfsni-xray-pasarguard.sh | sudo bash
+curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/master/selfsni-xray-pasarguard.sh | bash
 ```
 
 **⚠️ Если получаете ошибку 404**, проверьте:
@@ -45,7 +45,7 @@ curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarg
 cd /tmp
 git clone https://github.com/DANTECK-dev/fast-start-selfsni-pasarguar.git
 cd fast-start-selfsni-pasarguar
-sudo bash selfsni-xray-pasarguard.sh
+bash selfsni-xray-pasarguard.sh
 ```
 
 ### Вариант 3: Загрузить файлы на сервер (SCP)
@@ -58,7 +58,7 @@ scp pg-node.sh root@YOUR_SERVER:/tmp/
 
 # На сервере
 cd /tmp
-sudo bash selfsni-xray-pasarguard.sh
+bash selfsni-xray-pasarguard.sh
 ```
 
 **Примечание**: Скрипт автоматически скачает `fakesite.sh` и `pg-node.sh` с GitHub, если они не найдены локально.
@@ -66,7 +66,7 @@ sudo bash selfsni-xray-pasarguard.sh
 ## 📋 Что нужно подготовить
 
 1. **Домен** с настроенной A-записью на IP сервера
-2. **Root доступ** (sudo)
+2. **Root доступ** ()
 3. **Свободные порты**: 80, 443
 
 ## 💻 Что делает скрипт `selfsni-xray-pasarguard.sh`
@@ -137,13 +137,13 @@ git push -u origin main
 
 ```bash
 # Проверка nginx
-sudo systemctl status nginx
+systemctl status nginx
 
 # Проверка сайта
 curl https://ваш_домен
 
 # Проверка firewall
-sudo ufw status
+ufw status
 ```
 
 ## Настройка VLESS Reality Self SNI
@@ -230,21 +230,21 @@ sudo ufw status
 
 ```bash
 # 1. Проверьте порты
-sudo ss -tlnp | grep :443
+ ss -tlnp | grep :443
 
 # 2. Проверьте nginx
-sudo systemctl status nginx
+ systemctl status nginx
 curl -k https://127.0.0.1:443 -H "Host: grs-1.onesuper.ru"
 
 # 3. Проверьте реальный сайт
 curl https://grs-1.onesuper.ru
 
 # 4. Проверьте логи Xray
-sudo tail -f /var/log/xray/access.log
-sudo tail -f /var/log/xray/error.log
+ tail -f /var/log/xray/access.log
+ tail -f /var/log/xray/error.log
 
 # 5. Проверьте логи nginx
-sudo tail -f /var/log/nginx/reality-error.log
+ tail -f /var/log/nginx/reality-error.log
 ```
 
 ### В клиенте:
@@ -297,22 +297,22 @@ LISTEN 0    511    127.0.0.1:443    0.0.0.0:*      users:(("nginx",...))
 **Автоматическое исправление:**
 ```bash
 # Запустите скрипт для проверки и исправления
-sudo bash pasarguard-node-conf/fix-port-conflict.sh
+ bash pasarguard-node-conf/fix-port-conflict.sh
 ```
 
 **Ручное исправление:**
 
 1. **Проверьте Nginx конфигурацию:**
    ```bash
-   sudo grep -r "listen.*443" /etc/nginx/sites-enabled/
+    grep -r "listen.*443" /etc/nginx/sites-enabled/
    ```
    Должно быть: `listen 127.0.0.1:443` (НЕ `0.0.0.0:443` или просто `:443`)
 
 2. **Исправьте Nginx конфигурацию:**
    ```bash
    # Если нашли listen 0.0.0.0:443 или :443, замените на:
-   sudo sed -i 's/listen 0\.0\.0\.0:443/listen 127.0.0.1:443/g' /etc/nginx/sites-enabled/*.conf
-   sudo sed -i 's/listen :443 ssl/listen 127.0.0.1:443 ssl/g' /etc/nginx/sites-enabled/*.conf
+    sed -i 's/listen 0\.0\.0\.0:443/listen 127.0.0.1:443/g' /etc/nginx/sites-enabled/*.conf
+    sed -i 's/listen :443 ssl/listen 127.0.0.1:443 ssl/g' /etc/nginx/sites-enabled/*.conf
    ```
 
 3. **Проверьте Xray конфигурацию в Pasarguard Panel:**
@@ -321,15 +321,15 @@ sudo bash pasarguard-node-conf/fix-port-conflict.sh
 
 4. **Перезапустите сервисы:**
    ```bash
-   sudo systemctl restart nginx
-   sudo pg-node restart
+    systemctl restart nginx
+    pg-node restart
    # или
-   cd /opt/pg-node && sudo docker compose restart
+   cd /opt/pg-node &&  docker compose restart
    ```
 
 5. **Проверьте результат:**
    ```bash
-   sudo ss -tlnp | grep :443
+    ss -tlnp | grep :443
    # Должно быть:
    # LISTEN 0    4096   0.0.0.0:443      0.0.0.0:*    users:(("xray",...))
    # LISTEN 0    511    127.0.0.1:443    0.0.0.0:*    users:(("nginx",...))
@@ -339,15 +339,15 @@ sudo bash pasarguard-node-conf/fix-port-conflict.sh
 **Симптом**: Nginx не запускается с ошибкой "SSL certificate not found"
 **Решение**: 
 ```bash
-sudo certbot certonly --webroot -w /var/www/html -d grs-1.onesuper.ru
+ certbot certonly --webroot -w /var/www/html -d grs-1.onesuper.ru
 ```
 
 ### Проблема 3: Сайт не доступен
 **Симптом**: `curl https://grs-1.onesuper.ru` возвращает ошибку
 **Решение**:
 - Проверьте DNS: `dig grs-1.onesuper.ru`
-- Проверьте firewall: `sudo ufw allow 443/tcp`
-- Проверьте nginx: `sudo systemctl status nginx`
+- Проверьте firewall: ` ufw allow 443/tcp`
+- Проверьте nginx: ` systemctl status nginx`
 
 ### Проблема 4: VLESS Reality не работает
 **Симптом**: Клиент не может подключиться
@@ -364,17 +364,17 @@ sudo certbot certonly --webroot -w /var/www/html -d grs-1.onesuper.ru
 
 ```bash
 # Проверка конфигурации Xray
-sudo grep -A 10 '"realitySettings"' /opt/pg-node/xray/config.json
+ grep -A 10 '"realitySettings"' /opt/pg-node/xray/config.json
 
 # Проверка Nginx
-sudo nginx -t
-sudo systemctl status nginx
+ nginx -t
+ systemctl status nginx
 
 # Проверка портов
-sudo ss -tlnp | grep -E ":(80|443) "
+ ss -tlnp | grep -E ":(80|443) "
 
 # Проверка SSL сертификата
-sudo certbot certificates
+ certbot certificates
 ```
 
 Проверьте:
@@ -426,7 +426,7 @@ openssl s_client -connect ваш_сервер:443 -servername ses-1.onesuper.ru
 **На сервере:**
 ```bash
 # Захват трафика на порту 443
-sudo tcpdump -i any -n -A 'tcp port 443' -w reality-traffic.pcap
+ tcpdump -i any -n -A 'tcp port 443' -w reality-traffic.pcap
 
 # Анализ
 # В Wireshark откройте файл и проверьте:
@@ -485,11 +485,11 @@ curl -v https://ses-1.onesuper.ru 2>&1 | grep -i "server certificate"
 **Мониторинг:**
 ```bash
 # Логи Xray
-sudo tail -f /var/log/xray/access.log
-sudo tail -f /var/log/xray/error.log
+ tail -f /var/log/xray/access.log
+ tail -f /var/log/xray/error.log
 
 # Логи Nginx
-sudo tail -f /var/log/nginx/selfsni-error.log
+ tail -f /var/log/nginx/selfsni-error.log
 ```
 
 **Признаки блокировки:**
@@ -520,7 +520,7 @@ sudo tail -f /var/log/nginx/selfsni-error.log
 
 3. **Порты**: Если нужно открыть дополнительные порты:
    ```bash
-   sudo ufw allow PORT/tcp
+    ufw allow PORT/tcp
    ```
 
 ## Откат изменений
@@ -529,14 +529,14 @@ sudo tail -f /var/log/nginx/selfsni-error.log
 
 ```bash
 # Остановить nginx
-sudo systemctl stop nginx
+ systemctl stop nginx
 
 # Удалить Pasarguard Node
-sudo pg-node uninstall
+ pg-node uninstall
 
 # Сбросить firewall
-sudo ufw --force reset
-sudo ufw default allow incoming
-sudo ufw enable
+ ufw --force reset
+ ufw default allow incoming
+ ufw enable
 ```
 
