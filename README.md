@@ -444,25 +444,38 @@ LISTEN 0    511    127.0.0.1:443    0.0.0.0:*      users:(("nginx",...))
    # 2. Найдите дублирующиеся конфиги
    grep -r "server_name.*ваш_домен" /etc/nginx/sites-enabled/
    
-   # 3. Удалите ВСЕ конфиги с вашим доменом, кроме sni.conf
+   # 3. Переместите бэкапы в sites-available (если есть)
+   mkdir -p /etc/nginx/sites-available
+   mv /etc/nginx/sites-enabled/*.backup.* /etc/nginx/sites-available/ 2>/dev/null || true
+   
+   # 4. Удалите ВСЕ конфиги с вашим доменом, кроме sni.conf
    cd /etc/nginx/sites-enabled/
    for conf in *.conf; do
        if [ "$conf" != "sni.conf" ] && grep -q "server_name.*ваш_домен" "$conf" 2>/dev/null; then
            echo "Удаляю дублирующийся конфиг: $conf"
+           # Сохраняем бэкап в sites-available
+           cp "$conf" "/etc/nginx/sites-available/${conf}.backup.$(date +%Y%m%d-%H%M%S)"
            rm "$conf"
        fi
    done
    
-   # 4. Проверьте синтаксис и перезапустите
+   # 5. Проверьте синтаксис и перезапустите
    nginx -t
    systemctl restart nginx
    
-   # 5. Проверьте, что предупреждения исчезли
+   # 6. Проверьте, что предупреждения исчезли
    systemctl status nginx | grep -i conflict
    # Должно быть пусто (нет предупреждений)
+   
+   # 7. Проверьте, что в sites-enabled только sni.conf
+   ls -la /etc/nginx/sites-enabled/
+   # Должно быть только sni.conf
    ```
    
-   **Примечание**: Скрипт `selfsni-xray-pasarguard.sh` автоматически удаляет дублирующиеся конфиги, но если проблема уже есть, используйте решение выше.
+   **Примечание**: 
+   - Скрипт `selfsni-xray-pasarguard.sh` автоматически удаляет дублирующиеся конфиги и сохраняет бэкапы в `/etc/nginx/sites-available/`
+   - Если проблема уже есть, используйте решение выше
+   - Бэкапы хранятся в `sites-available/`, а не в `sites-enabled/`, чтобы не засорять директорию активных конфигов
 
 5. **Неправильная конфигурация Reality**:
    - Проверьте `dest`: должен быть `127.0.0.1:443` (НЕ 8080!)

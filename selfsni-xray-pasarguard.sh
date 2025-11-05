@@ -171,19 +171,32 @@ if bash "$MODIFIED_FAKESITE" --selfsni-port 443; then
             # Удаляем все старые конфиги с этим доменом (чтобы избежать конфликтов)
             info "Удаление старых конфигов с доменом $DOMAIN..."
             REMOVED_COUNT=0
+            
+            # Создаем директорию для бэкапов, если её нет
+            mkdir -p /etc/nginx/sites-available
+            
             for old_conf in /etc/nginx/sites-enabled/*.conf; do
                 if [ -f "$old_conf" ] && [ "$old_conf" != "/etc/nginx/sites-enabled/sni.conf" ]; then
                     # Проверяем, есть ли в конфиге этот домен
                     if grep -q "server_name.*$DOMAIN" "$old_conf" 2>/dev/null; then
                         # Также проверяем, слушает ли он на 443 (может быть старый конфиг от fakesite.sh)
                         if grep -q "listen.*443" "$old_conf" 2>/dev/null; then
-                            BACKUP_NAME="/etc/nginx/sites-enabled/$(basename "$old_conf").backup.$(date +%Y%m%d-%H%M%S)"
+                            BACKUP_NAME="/etc/nginx/sites-available/$(basename "$old_conf").backup.$(date +%Y%m%d-%H%M%S)"
                             cp "$old_conf" "$BACKUP_NAME"
                             rm -f "$old_conf"
-                            info "Удален старый конфиг: $(basename "$old_conf") (бэкап: $(basename "$BACKUP_NAME"))"
+                            info "Удален старый конфиг: $(basename "$old_conf") (бэкап перемещен в sites-available)"
                             REMOVED_COUNT=$((REMOVED_COUNT + 1))
                         fi
                     fi
+                fi
+            done
+            
+            # Удаляем старые бэкапы из sites-enabled (если они там остались)
+            for backup_file in /etc/nginx/sites-enabled/*.backup.*; do
+                if [ -f "$backup_file" ]; then
+                    BACKUP_NAME="/etc/nginx/sites-available/$(basename "$backup_file")"
+                    mv "$backup_file" "$BACKUP_NAME" 2>/dev/null || rm -f "$backup_file"
+                    info "Перемещен старый бэкап в sites-available: $(basename "$backup_file")"
                 fi
             done
             
@@ -195,8 +208,9 @@ if bash "$MODIFIED_FAKESITE" --selfsni-port 443; then
             
             # Создаем бэкап существующего sni.conf если есть
             if [ -f /etc/nginx/sites-enabled/sni.conf ]; then
-                cp /etc/nginx/sites-enabled/sni.conf /etc/nginx/sites-enabled/sni.conf.backup.$(date +%Y%m%d-%H%M%S)
-                info "Создан бэкап существующего sni.conf"
+                BACKUP_NAME="/etc/nginx/sites-available/sni.conf.backup.$(date +%Y%m%d-%H%M%S)"
+                cp /etc/nginx/sites-enabled/sni.conf "$BACKUP_NAME"
+                info "Создан бэкап существующего sni.conf в sites-available"
             fi
             
             # Копируем в sites-enabled
