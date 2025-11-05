@@ -152,24 +152,50 @@ cd "$SCRIPT_DIR"
 if bash "$MODIFIED_FAKESITE" --selfsni-port 443; then
     success "Self SNI установлен"
     
-    # Исправляем конфиг Nginx - добавляем reuseport и правильный listen
-    info "Исправление конфигурации Nginx..."
-    for conf in /etc/nginx/sites-enabled/*.conf; do
-        if [ -f "$conf" ]; then
-            # Добавляем reuseport к listen 127.0.0.1:443
-            sed -i 's/listen 127\.0\.0\.1:443 ssl http2/listen 127.0.0.1:443 ssl http2 reuseport/g' "$conf"
-            sed -i 's/listen \[::1\]:443 ssl http2/listen [::1]:443 ssl http2 reuseport/g' "$conf"
-            
-            # Убираем listen на 0.0.0.0:443 если есть
-            sed -i 's/listen 0\.0\.0\.0:443/listen 127.0.0.1:443/g' "$conf"
-            sed -i 's/listen :443 ssl/listen 127.0.0.1:443 ssl/g' "$conf"
-        fi
-    done
+    # Заменяем конфиг Nginx на правильный из GitHub
+    info "Замена конфигурации Nginx на sni.conf из репозитория..."
     
-    # Проверка синтаксиса
-    if nginx -t >/dev/null 2>&1; then
-        systemctl restart nginx || true
-        success "Nginx конфигурация исправлена"
+    # Определяем URL репозитория (используем тот же, что и для скрипта)
+    GITHUB_REPO="DANTECK-dev/fast-start-selfsni-pasarguar"
+    GITHUB_BRANCH="refs/heads/main"
+    SNI_CONF_URL="https://raw.githubusercontent.com/$GITHUB_REPO/$GITHUB_BRANCH/sni.conf"
+    
+    # Скачиваем sni.conf
+    info "Скачивание sni.conf с GitHub..."
+    if curl -sL "$SNI_CONF_URL" -o /tmp/sni.conf.tmp; then
+        # Проверяем, что файл скачался (не пустой и не 404)
+        if [ -s /tmp/sni.conf.tmp ] && ! grep -q "404: Not Found" /tmp/sni.conf.tmp; then
+            # Заменяем домен в скачанном конфиге на введенный пользователем
+            # Заменяем все вхождения домена
+            sed -i "s/ses-1.onesuper.ru/$DOMAIN/g" /tmp/sni.conf.tmp
+            
+            # Создаем бэкап существующего конфига
+            if [ -f /etc/nginx/sites-enabled/sni.conf ]; then
+                cp /etc/nginx/sites-enabled/sni.conf /etc/nginx/sites-enabled/sni.conf.backup.$(date +%Y%m%d-%H%M%S)
+                info "Создан бэкап существующего sni.conf"
+            fi
+            
+            # Копируем в sites-enabled
+            cp /tmp/sni.conf.tmp /etc/nginx/sites-enabled/sni.conf
+            chmod 644 /etc/nginx/sites-enabled/sni.conf
+            rm -f /tmp/sni.conf.tmp
+            
+            # Проверка синтаксиса
+            if nginx -t >/dev/null 2>&1; then
+                systemctl restart nginx || true
+                success "Nginx конфигурация обновлена из sni.conf (домен: $DOMAIN)"
+            else
+                error "Ошибка синтаксиса в sni.conf!"
+                warning "Проверьте: nginx -t"
+                warning "Восстановите бэкап, если нужно"
+            fi
+        else
+            warning "sni.conf не найден или пустой на GitHub"
+            warning "Используем существующую конфигурацию от fakesite.sh"
+        fi
+    else
+        warning "Не удалось скачать sni.conf с GitHub"
+        warning "Используем существующую конфигурацию от fakesite.sh"
     fi
 else
     error "Ошибка при установке Self SNI"
