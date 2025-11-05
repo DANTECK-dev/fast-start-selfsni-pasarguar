@@ -4,16 +4,16 @@
 
 ### Вариант 1: Прямой запуск с GitHub (рекомендуется)
 
-**⚠️ ВАЖНО**: Замените `USER/REPO` на ваш GitHub репозиторий!
+**⚠️ ВАЖНО**: Замените `DANTECK-dev/fast-start-selfsni-pasarguar` на ваш GitHub репозиторий!
 
 ```bash
 # Запуск единого скрипта установки
-sudo bash <(curl -Ls https://raw.githubusercontent.com/USER/REPO/main/pasarguard-node-conf/selfsni-xray-pasarguard.sh)
+sudo bash <(curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/main/pasarguard-node-conf/selfsni-xray-pasarguard.sh)
 ```
 
 Или скачать и запустить:
 ```bash
-curl -Ls https://raw.githubusercontent.com/USER/REPO/main/pasarguard-node-conf/selfsni-xray-pasarguard.sh -o /tmp/setup.sh
+curl -Ls https://raw.githubusercontent.com/DANTECK-dev/fast-start-selfsni-pasarguar/main/pasarguard-node-conf/selfsni-xray-pasarguard.sh -o /tmp/setup.sh
 sudo bash /tmp/setup.sh
 ```
 
@@ -22,7 +22,7 @@ sudo bash /tmp/setup.sh
 ```bash
 # На сервере
 cd /tmp
-git clone https://github.com/USER/REPO.git
+git clone https://github.com/DANTECK-dev/fast-start-selfsni-pasarguar.git
 cd REPO/pasarguard-node-conf
 sudo bash selfsni-xray-pasarguard.sh
 ```
