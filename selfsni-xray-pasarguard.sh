@@ -166,10 +166,34 @@ if bash "$MODIFIED_FAKESITE" --selfsni-port 443; then
         # Проверяем, что файл скачался (не пустой и не 404)
         if [ -s /tmp/sni.conf.tmp ] && ! grep -q "404: Not Found" /tmp/sni.conf.tmp; then
             # Заменяем домен в скачанном конфиге на введенный пользователем
-            # Заменяем все вхождения домена
             sed -i "s/ses-1.onesuper.ru/$DOMAIN/g" /tmp/sni.conf.tmp
             
-            # Создаем бэкап существующего конфига
+            # Удаляем все старые конфиги с этим доменом (чтобы избежать конфликтов)
+            info "Удаление старых конфигов с доменом $DOMAIN..."
+            REMOVED_COUNT=0
+            for old_conf in /etc/nginx/sites-enabled/*.conf; do
+                if [ -f "$old_conf" ] && [ "$old_conf" != "/etc/nginx/sites-enabled/sni.conf" ]; then
+                    # Проверяем, есть ли в конфиге этот домен
+                    if grep -q "server_name.*$DOMAIN" "$old_conf" 2>/dev/null; then
+                        # Также проверяем, слушает ли он на 443 (может быть старый конфиг от fakesite.sh)
+                        if grep -q "listen.*443" "$old_conf" 2>/dev/null; then
+                            BACKUP_NAME="/etc/nginx/sites-enabled/$(basename "$old_conf").backup.$(date +%Y%m%d-%H%M%S)"
+                            cp "$old_conf" "$BACKUP_NAME"
+                            rm -f "$old_conf"
+                            info "Удален старый конфиг: $(basename "$old_conf") (бэкап: $(basename "$BACKUP_NAME"))"
+                            REMOVED_COUNT=$((REMOVED_COUNT + 1))
+                        fi
+                    fi
+                fi
+            done
+            
+            if [ $REMOVED_COUNT -gt 0 ]; then
+                success "Удалено $REMOVED_COUNT дублирующихся конфигов"
+            else
+                info "Дублирующиеся конфиги не найдены"
+            fi
+            
+            # Создаем бэкап существующего sni.conf если есть
             if [ -f /etc/nginx/sites-enabled/sni.conf ]; then
                 cp /etc/nginx/sites-enabled/sni.conf /etc/nginx/sites-enabled/sni.conf.backup.$(date +%Y%m%d-%H%M%S)
                 info "Создан бэкап существующего sni.conf"
@@ -181,13 +205,30 @@ if bash "$MODIFIED_FAKESITE" --selfsni-port 443; then
             rm -f /tmp/sni.conf.tmp
             
             # Проверка синтаксиса
-            if nginx -t >/dev/null 2>&1; then
-                systemctl restart nginx || true
-                success "Nginx конфигурация обновлена из sni.conf (домен: $DOMAIN)"
+            info "Проверка синтаксиса Nginx..."
+            if nginx -t >/tmp/nginx-test.log 2>&1; then
+                success "Синтаксис Nginx корректен"
+                
+                # Перезапускаем Nginx
+                if systemctl restart nginx; then
+                    sleep 2
+                    # Проверяем, что сайт доступен
+                    if curl -k -s -m 5 "https://127.0.0.1:443" -H "Host: $DOMAIN" >/dev/null 2>&1; then
+                        success "Nginx конфигурация обновлена, сайт доступен на localhost:443"
+                    else
+                        warning "Nginx перезапущен, но сайт не отвечает на localhost:443"
+                        warning "Проверьте SSL сертификат и логи: tail -f /var/log/nginx/error.log"
+                    fi
+                else
+                    error "Ошибка перезапуска Nginx"
+                    warning "Проверьте: systemctl status nginx"
+                fi
             else
                 error "Ошибка синтаксиса в sni.conf!"
-                warning "Проверьте: nginx -t"
+                warning "Детали:"
+                cat /tmp/nginx-test.log | tail -5
                 warning "Восстановите бэкап, если нужно"
+                rm -f /tmp/nginx-test.log
             fi
         else
             warning "sni.conf не найден или пустой на GitHub"
@@ -345,8 +386,69 @@ echo "y" | ufw enable >/dev/null 2>&1 || true
 success "Firewall настроен"
 echo ""
 
-# Шаг 9: Проверка и вывод информации
+# Шаг 9: Проверка установки
 step "Шаг 9: Проверка установки"
+echo ""
+
+# Проверка Nginx
+info "Проверка Nginx..."
+if systemctl is-active --quiet nginx; then
+    success "Nginx запущен"
+    
+    # Проверка портов
+    if ss -tlnp | grep -q "127.0.0.1:443.*nginx"; then
+        success "Nginx слушает на 127.0.0.1:443"
+    else
+        warning "Nginx НЕ слушает на 127.0.0.1:443"
+        warning "Проверьте конфигурацию: nginx -t"
+    fi
+    
+    # Проверка доступности сайта
+    if curl -k -s -m 5 "https://127.0.0.1:443" -H "Host: $DOMAIN" >/dev/null 2>&1; then
+        success "Сайт доступен на localhost:443"
+    else
+        warning "Сайт не отвечает на localhost:443"
+        warning "Проверьте SSL сертификат и логи nginx"
+    fi
+else
+    warning "Nginx не запущен"
+    warning "Запустите: systemctl start nginx"
+fi
+echo ""
+
+# Проверка SSL сертификата
+info "Проверка SSL сертификата..."
+CERT_PATH="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+if [ -f "$CERT_PATH" ]; then
+    success "SSL сертификат найден: $CERT_PATH"
+    EXPIRY=$(openssl x509 -enddate -noout -in "$CERT_PATH" 2>/dev/null | cut -d= -f2)
+    echo "   Срок действия: $EXPIRY"
+else
+    error "SSL сертификат не найден: $CERT_PATH"
+    warning "Получите сертификат: certbot certonly --webroot -w /var/www/html -d $DOMAIN"
+fi
+echo ""
+
+# Проверка портов
+info "Проверка портов..."
+PORTS_OK=1
+if ss -tlnp | grep -q "0.0.0.0:443.*xray"; then
+    success "Xray слушает на 0.0.0.0:443"
+elif ss -tlnp | grep -q ":443.*xray"; then
+    warning "Xray слушает на порту 443, но не на 0.0.0.0"
+    PORTS_OK=0
+else
+    warning "Xray НЕ слушает на 0.0.0.0:443"
+    warning "Xray будет запущен через Pasarguard Panel"
+    PORTS_OK=0
+fi
+
+if ss -tlnp | grep -q "127.0.0.1:443.*nginx"; then
+    success "Nginx слушает на 127.0.0.1:443"
+else
+    warning "Nginx НЕ слушает на 127.0.0.1:443"
+    PORTS_OK=0
+fi
 echo ""
 
 info "=========================================="
@@ -377,6 +479,28 @@ echo ""
 warning "ВНИМАНИЕ: Убедитесь, что SSH порт открыт перед выходом из сессии!"
 echo ""
 
+info "КРИТИЧЕСКИ ВАЖНО: Порядок запуска сервисов!"
+echo ""
+echo "После настройки Xray в Pasarguard Panel:"
+echo ""
+echo "1. Остановите все сервисы:"
+echo "   systemctl stop nginx"
+echo "   pg-node down"
+echo ""
+echo "2. Запустите Nginx первым:"
+echo "   systemctl start nginx"
+echo ""
+echo "3. Запустите Pasarguard Node (Xray):"
+echo "   pg-node up"
+echo "   или через Pasarguard Panel"
+echo ""
+echo "4. Проверьте порты:"
+echo "   ss -tlnp | grep :443"
+echo "   Должно быть:"
+echo "   - Xray на 0.0.0.0:443"
+echo "   - Nginx на 127.0.0.1:443"
+echo ""
+
 info "Следующие шаги:"
 echo "  1. Настройте Xray в Pasarguard Panel:"
 echo "     - Используйте xray.json"
@@ -386,7 +510,13 @@ echo "     - Создайте хост (Freedom, tag: direct)"
 echo ""
 echo "  2. Проверьте работу:"
 echo "     - curl https://$DOMAIN"
-echo "     - sudo systemctl status nginx"
+echo "     - systemctl status nginx"
+echo ""
+echo "  3. Если получаете ошибку 'REALITY: processed invalid connection':"
+echo "     - Проверьте порядок запуска (см. выше)"
+echo "     - Убедитесь, что Nginx запущен на 127.0.0.1:443"
+echo "     - Убедитесь, что Xray запущен на 0.0.0.0:443"
+echo "     - Проверьте логи: tail -f /var/log/xray/error.log"
 echo ""
 
 # Очистка временных файлов

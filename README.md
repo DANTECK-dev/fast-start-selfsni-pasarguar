@@ -260,16 +260,49 @@ curl https://grs-1.onesuper.ru
 
 **Решение**: Используется `reuseport` в Nginx для совместного использования порта.
 
-**Порядок запуска**:
+**Порядок запуска** (КРИТИЧЕСКИ ВАЖНО!):
 
-1. **Остановите все** (Nginx и Xray)
-2. **Запустите Nginx**: `systemctl start nginx`
-3. **Запустите Xray** (через Pasarguard Panel или `pg-node up`)
+**Правильный порядок (рекомендуется)**:
 
-**Если не работает**, попробуйте другой порядок:
-1. **Остановите все**
-2. **Запустите Xray** (через Pasarguard Panel или `pg-node up`)
-3. **Запустите Nginx**: `systemctl start nginx`
+1. **Остановите все** (Nginx и Xray):
+   ```bash
+   systemctl stop nginx
+   pg-node down
+   # или cd /opt/pg-node && docker compose down
+   ```
+
+2. **Запустите Nginx ПЕРВЫМ**:
+   ```bash
+   systemctl start nginx
+   systemctl status nginx  # Проверьте, что запущен
+   ```
+
+3. **Запустите Xray (Pasarguard Node)**:
+   ```bash
+   pg-node up
+   # или через Pasarguard Panel
+   ```
+
+4. **Проверьте порты**:
+   ```bash
+   ss -tlnp | grep :443
+   ```
+   
+   Должно быть:
+   ```
+   LISTEN 0    4096   0.0.0.0:443      0.0.0.0:*      users:(("xray",...))
+   LISTEN 0    511    127.0.0.1:443    0.0.0.0:*      users:(("nginx",...))
+   ```
+
+**⚠️ ВАЖНО**: Если порядок неправильный, вы получите ошибку:
+- `REALITY: processed invalid connection: target sent incorrect server hello`
+- `operation was canceled`
+
+**Если не работает**, проверьте:
+1. Nginx запущен и слушает на `127.0.0.1:443`
+2. Xray запущен и слушает на `0.0.0.0:443`
+3. Сайт доступен: `curl -k https://127.0.0.1:443 -H "Host: ваш_домен"`
+4. SSL сертификат валиден: `certbot certificates`
 
 **Проверка**:
 ```bash
@@ -349,14 +382,104 @@ LISTEN 0    511    127.0.0.1:443    0.0.0.0:*      users:(("nginx",...))
 - Проверьте firewall: ` ufw allow 443/tcp`
 - Проверьте nginx: ` systemctl status nginx`
 
-### Проблема 4: VLESS Reality не работает
-**Симптом**: Клиент не может подключиться
-**Решение**:
-- Проверьте `dest`: должен быть `127.0.0.1:443`
-- Проверьте `serverNames`: должен быть ваш домен (Self SNI)
-- Проверьте логи Xray на ошибки
-- Убедитесь, что реальный сайт доступен
-- Убедитесь, что хост создан и привязан к группе
+### Проблема 4: VLESS Reality не работает - "REALITY: processed invalid connection"
+
+**Симптом**: 
+- Ошибка: `REALITY: processed invalid connection: target sent incorrect server hello or handshake incomplete`
+- Клиент не может подключиться
+- Ошибка: `operation was canceled`
+
+**Причины и решения**:
+
+1. **Неправильный порядок запуска сервисов** (самая частая причина):
+   ```bash
+   # Остановите все
+   systemctl stop nginx
+   pg-node down
+   
+   # Запустите Nginx ПЕРВЫМ
+   systemctl start nginx
+   
+   # Затем запустите Xray
+   pg-node up
+   # или через Pasarguard Panel
+   ```
+
+2. **Nginx не слушает на правильном адресе**:
+   ```bash
+   # Проверьте
+   ss -tlnp | grep :443
+   
+   # Должно быть:
+   # LISTEN 0    4096   0.0.0.0:443      0.0.0.0:*    users:(("xray",...))
+   # LISTEN 0    511    127.0.0.1:443    0.0.0.0:*    users:(("nginx",...))
+   
+   # Если Nginx не на 127.0.0.1:443, проверьте конфиг:
+   grep -r "listen.*443" /etc/nginx/sites-enabled/
+   # Должно быть: listen 127.0.0.1:443 ssl http2 reuseport;
+   ```
+
+3. **Сайт не доступен на localhost:443**:
+   ```bash
+   # Проверьте доступность
+   curl -k https://127.0.0.1:443 -H "Host: ваш_домен"
+   
+   # Если не работает, проверьте:
+   systemctl status nginx
+   nginx -t
+   tail -f /var/log/nginx/error.log
+   ```
+
+4. **Дублирующиеся конфиги Nginx (conflicting server name)** ⚠️ **ОЧЕНЬ ЧАСТАЯ ПРОБЛЕМА**:
+
+   **Симптом**: В логах Nginx: `conflicting server name "ваш_домен" on 0.0.0.0:443` или `on 127.0.0.1:443`
+   
+   **Причина**: `fakesite.sh` создал свой конфиг (может слушать на 0.0.0.0:443 или другом адресе), а потом скрипт добавил `sni.conf`, но не удалил старый конфиг от fakesite.sh.
+   
+   **Быстрое решение**:
+   ```bash
+   # 1. Проверьте все конфиги
+   ls -la /etc/nginx/sites-enabled/
+   
+   # 2. Найдите дублирующиеся конфиги
+   grep -r "server_name.*ваш_домен" /etc/nginx/sites-enabled/
+   
+   # 3. Удалите ВСЕ конфиги с вашим доменом, кроме sni.conf
+   cd /etc/nginx/sites-enabled/
+   for conf in *.conf; do
+       if [ "$conf" != "sni.conf" ] && grep -q "server_name.*ваш_домен" "$conf" 2>/dev/null; then
+           echo "Удаляю дублирующийся конфиг: $conf"
+           rm "$conf"
+       fi
+   done
+   
+   # 4. Проверьте синтаксис и перезапустите
+   nginx -t
+   systemctl restart nginx
+   
+   # 5. Проверьте, что предупреждения исчезли
+   systemctl status nginx | grep -i conflict
+   # Должно быть пусто (нет предупреждений)
+   ```
+   
+   **Примечание**: Скрипт `selfsni-xray-pasarguard.sh` автоматически удаляет дублирующиеся конфиги, но если проблема уже есть, используйте решение выше.
+
+5. **Неправильная конфигурация Reality**:
+   - Проверьте `dest`: должен быть `127.0.0.1:443` (НЕ 8080!)
+   - Проверьте `serverNames`: должен быть ваш домен (Self SNI)
+   - Проверьте, что хост создан и привязан к группе
+
+6. **Проверьте логи Xray**:
+   ```bash
+   tail -f /var/log/xray/error.log
+   # Ищите ошибки подключения к dest
+   ```
+
+7. **Проверьте, что реальный сайт доступен**:
+   ```bash
+   curl https://ваш_домен
+   # Сайт должен отвечать
+   ```
 
 ## Проверка защиты от DPI/РКН
 
