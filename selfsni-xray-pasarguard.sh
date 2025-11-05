@@ -533,6 +533,70 @@ echo "     - Убедитесь, что Xray запущен на 0.0.0.0:443"
 echo "     - Проверьте логи: tail -f /var/log/xray/error.log"
 echo ""
 
+# Вывод важных данных для Pasarguard Panel
+step "Важные данные для настройки Pasarguard Panel:"
+echo ""
+info "Порт Pasarguard Node:"
+echo "  $PASARGUARD_PORT"
+echo ""
+
+info "SSL сертификат для Pasarguard Panel:"
+echo "  Расположение: /var/lib/pg-node/certs/ssl_cert.pem"
+echo ""
+if [ -f /var/lib/pg-node/certs/ssl_cert.pem ]; then
+    cat /var/lib/pg-node/certs/ssl_cert.pem
+    echo ""
+else
+    warning "Файл сертификата не найден: /var/lib/pg-node/certs/ssl_cert.pem"
+    info "Проверяю альтернативные пути..."
+    # Проверяем альтернативные пути
+    CERT_FOUND=0
+    for alt_path in "/opt/pg-node/.env" "/opt/node/.env"; do
+        if [ -f "$alt_path" ] && [ $CERT_FOUND -eq 0 ]; then
+            # Пытаемся найти DATA_DIR из .env
+            DATA_DIR_LINE=$(grep "^DATA_DIR" "$alt_path" 2>/dev/null)
+            if [ -n "$DATA_DIR_LINE" ]; then
+                DATA_DIR=$(echo "$DATA_DIR_LINE" | cut -d'=' -f2 | tr -d ' "')
+                if [ -n "$DATA_DIR" ] && [ -f "$DATA_DIR/certs/ssl_cert.pem" ]; then
+                    info "Найден сертификат: $DATA_DIR/certs/ssl_cert.pem"
+                    cat "$DATA_DIR/certs/ssl_cert.pem"
+                    echo ""
+                    CERT_FOUND=1
+                    break
+                fi
+            fi
+        fi
+    done
+    if [ $CERT_FOUND -eq 0 ]; then
+        warning "Сертификат не найден. Проверьте вручную после запуска Pasarguard Node:"
+        echo "  cat /var/lib/pg-node/certs/ssl_cert.pem"
+    fi
+fi
+
+info "API Key для Pasarguard Panel:"
+echo ""
+# Проверяем возможные пути к .env файлу
+API_KEY_FOUND=0
+for env_file in "/opt/pg-node/.env" "/opt/node/.env"; do
+    if [ -f "$env_file" ]; then
+        API_KEY=$(grep "^API_KEY" "$env_file" 2>/dev/null | cut -d'=' -f2 | tr -d ' "')
+        if [ -n "$API_KEY" ]; then
+            echo "  $API_KEY"
+            API_KEY_FOUND=1
+            break
+        fi
+    fi
+done
+
+if [ $API_KEY_FOUND -eq 0 ]; then
+    warning "API Key не найден в стандартных местах"
+    info "Проверьте вручную:"
+    echo "  cat /opt/pg-node/.env | grep API_KEY"
+    echo "  или"
+    echo "  cat /opt/node/.env | grep API_KEY"
+fi
+echo ""
+
 # Очистка временных файлов
 info "Очистка временных файлов..."
 rm -rf "$SCRIPT_DIR"
